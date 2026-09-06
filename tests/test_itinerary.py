@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import unittest
 from unittest.mock import Mock, patch
 
@@ -10,6 +11,15 @@ from backend.itinerary.service import ItineraryService
 
 
 class PlannerTests(unittest.TestCase):
+    def test_single_call_exposes_validation_failure_without_repair(self):
+        model = Mock(return_value='{}')
+        with patch.dict(os.environ, {'BEDROCK_SINGLE_CALL': '1'}):
+            with self.assertRaises(Problem) as caught:
+                generate(self.payload, model)
+        model.assert_called_once()
+        self.assertIn('days', str(caught.exception))
+        self.assertIn('No automatic repair', str(caught.exception))
+
     def setUp(self):
         self.store = DemoStore()
         self.service = ItineraryService(self.store, fixture_model, "demo-fixture")
@@ -79,6 +89,18 @@ class PlannerTests(unittest.TestCase):
         self.service.plan("osaka", "alex")
         self.service.save_preferences("osaka", "alex", {**self.store.people[0]["preferences"], "must_do": ["Museums"]})
         self.assertTrue(self.service.state("osaka", "alex")["stale"])
+
+    def test_recalculation_sends_updated_must_dos_with_previous_draft(self):
+        first = self.service.plan("osaka", "alex")
+        self.service.save_preferences("osaka", "alex", {
+            **self.store.people[0]["preferences"], "must_do": ["Museums"]})
+        model = Mock(side_effect=fixture_model)
+        self.service.model = model
+        self.service.plan("osaka", "alex", True)
+        request = json.loads(model.call_args.args[1])
+        alex = next(m for m in request["group_input"]["members"] if m["user_id"] == "alex")
+        self.assertEqual(alex["preferences"]["must_do"], ["Museums"])
+        self.assertEqual(request["previous_itinerary"], first["itinerary"])
 
     def test_invalid_json_is_not_saved(self):
         self.service.model = lambda *_: "```json\n{}\n```"

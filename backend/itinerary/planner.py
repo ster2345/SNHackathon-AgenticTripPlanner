@@ -3,6 +3,7 @@ import copy
 import hashlib
 import json
 import logging
+import os
 import re
 from datetime import date, timedelta
 from decimal import Decimal
@@ -125,6 +126,17 @@ ledger debts. Do not claim verified venues, opening hours, prices, allergy safet
 Keep the fixed trip dates; flag unavailable members. Never silently relax a restriction.
 When previous_itinerary is present, adjust only affected activities, preserve unaffected
 activity identities: keep an existing alternative's ID when its participants remain.
+The current group_input is authoritative. Previous activity reasons describe old
+preferences and must not override current must_do choices. First reassess the previous
+activities against each member's current preferences, then preserve only what still fits.
+If a current must-do is missing, replace or add an affected activity to address it when
+feasible. Updating only flags is not sufficient to satisfy an unmet feasible must-do.
+For example, if a member now requests museums instead of parks, replace an appropriate
+park slot with a museum visit, retain unrelated compatible meals, and update stale reasons.
+Unverified opening hours alone are not a reason to omit a museum: propose a tentative
+museum visit with a verification flag, as you do for other unverified attractions.
+If a must-do truly cannot fit due to dates, budget, restrictions, or destination, explain
+that concrete conflict in flags. Do not force changes when existing activities already fit.
 Never reuse a departed member's exclusive activity ID for the remaining group's alternative.
 Remove that exclusive activity and retain the surviving alternative's original ID.
 Venue menus, certifications, availability, route difficulty, and accessibility are all
@@ -292,11 +304,19 @@ def _generate(payload, model, previous=None, reason=""):
         if remaining() < 5:
             raise Problem("Planning timed out; no further retry was started. Your saved itinerary has not changed.", 504)
         # Transport/model-access errors are not JSON errors and must not trigger a retry here.
+        logging.getLogger(__name__).info("Planner stage=%s members=%d previous_draft=%s",
+                                        "initial" if attempt == 0 else "json-repair",
+                                        len(payload["members"]), previous is not None)
         raw = model(SYSTEM_PROMPT, message)
         try:
             value = validate_output(parse_model_json(raw), payload)
+            logging.getLogger(__name__).info("Planner output validation passed")
             break
         except Problem as exc:
+            logging.getLogger(__name__).warning("Planner validation failed: %s", exc)
+            if os.environ.get("BEDROCK_SINGLE_CALL") == "1":
+                raise Problem(str(exc) + " No automatic repair was attempted (single-call mode). "
+                              "Your saved itinerary has not changed.", 502) from exc
             if attempt == 1:
                 raise Problem("Claude could not produce a valid itinerary after one automatic retry. "
                               "Your saved itinerary has not changed. " + str(exc), 502) from exc

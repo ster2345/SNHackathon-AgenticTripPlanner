@@ -13,6 +13,23 @@ from backend.itinerary.storage import DynamoStore
 
 @unittest.skipUnless(importlib.util.find_spec("boto3"), "Install requirements.txt for AWS adapter tests")
 class AwsAdapterTests(unittest.TestCase):
+    def test_diagnostics_show_throttle_metadata_without_prompt(self):
+        from botocore.exceptions import ClientError
+        client = Mock()
+        client.converse.side_effect = ClientError({
+            'Error': {'Code': 'ThrottlingException', 'Message': 'Too many requests'},
+            'ResponseMetadata': {'RequestId': 'test-request', 'RetryAttempts': 1}}, 'Converse')
+        with patch.dict(os.environ, {'BEDROCK_MODEL_ID': 'test-model'}), patch('boto3.client', return_value=client):
+            with self.assertLogs('backend.itinerary.bedrock', level='INFO') as logs:
+                with self.assertRaises(Problem):
+                    call_claude('private-system', 'private-member-profile')
+        output = '\n'.join(logs.output)
+        self.assertIn('request_id=test-request', output)
+        self.assertIn('sdk_retries=1', output)
+        self.assertIn('Too many requests', output)
+        self.assertNotIn('private-system', output)
+        self.assertNotIn('private-member-profile', output)
+
     def test_oversized_input_is_rejected_before_aws_call(self):
         with patch('boto3.client') as factory:
             with self.assertRaises(Problem) as caught:

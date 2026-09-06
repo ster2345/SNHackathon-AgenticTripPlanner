@@ -6,6 +6,8 @@ Claude with the same demo members; it does NOT connect to production tables.
 import argparse
 import json
 import mimetypes
+import logging
+import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -20,9 +22,20 @@ from .service import ItineraryService
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
+    parser.add_argument("--single-call", action="store_true", help="Disable SDK retries and JSON repair calls for low-quota accounts")
+    parser.add_argument("--diagnostics", action="store_true", help="Log planner call stages and Bedrock metadata, without prompts")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--dashboard", action="store_true", help="Serve the integrated team dashboard build")
     args = parser.parse_args()
+    if args.single_call:
+        os.environ["BEDROCK_SINGLE_CALL"] = "1"
+    if args.diagnostics:
+        logger = logging.getLogger("backend.itinerary")
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(name)s %(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
     if args.live:
         from dotenv import load_dotenv
         load_dotenv()

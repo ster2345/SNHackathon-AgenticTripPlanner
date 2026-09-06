@@ -4,10 +4,10 @@
 
 - **Done:** the trip planner is connected to the team's dashboard. Members can
   enter preferences, generate a plan, and recalculate it when plans change.
-- **Tested:** the local demo works, 40 backend tests pass, and a small test call
-  to Claude succeeded.
-- **Current issue:** AWS sometimes limits our AI requests (throttling). Request
-  limits and timeouts have been added, but full AI generation needs another test.
+- **Tested:** local demo plus live two-member generation and preference-based
+  recalculation were manually checked. Offline backend tests also pass.
+- **Quota note:** the personal test account allows one model request per minute.
+  An automatic JSON repair call can hit that limit; use single-call mode below.
 - **Still needed:** connect and test the real database and user login with Person A,
   then deploy the app to AWS.
 
@@ -28,6 +28,25 @@ Teammates should use their own AWS login. Keep credentials private and do not
 commit `.env`. See the [setup guide](../../docs/person-b.md) when ready to connect AWS.
 
 ## Run the integrated dashboard
+
+For live testing on a low-quota account, use:
+
+```powershell
+.\.venv\bin\python.exe -m backend.itinerary.local_server --dashboard --live --diagnostics --single-call --port 8770
+```
+
+Build the frontend first using the commands below, then open http://127.0.0.1:8770.
+Single-call mode disables SDK retries and automatic JSON repair; invalid output is
+reported without replacing the saved draft. Space calls at least 90 seconds apart
+on the one-request-per-minute test account. Diagnostics show call metadata and
+validation errors, without logging prompts or model responses.
+For other entry points, `BEDROCK_SINGLE_CALL=1` enables the same behavior.
+
+Switching AWS accounts does not require application code changes when resource
+schemas match. Select the team's local AWS credentials/profile, update region,
+model ID and table names as needed, and configure permissions in the team account.
+Restart the server and run the smoke test after switching. Local live mode still
+uses in-memory storage; test DynamoDB separately before deployment.
 
 Run these commands from the project root (`SNHackathon-AgenticTripPlanner`), not this folder.
 
