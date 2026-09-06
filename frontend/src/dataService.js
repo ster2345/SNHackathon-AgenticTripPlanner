@@ -24,8 +24,33 @@ import { mockData } from "./mockData";
 // Deep-clone the initial mock data into mutable in-memory "tables".
 // Using structuredClone so edits during the session don't mutate the
 // original imported mockData object.
-let db = structuredClone(mockData);
+const STORAGE_KEY = "tripPlannerData";
 
+
+function loadDatabase() {
+  const savedData = localStorage.getItem(STORAGE_KEY);
+
+  if (savedData) {
+    try {
+      return JSON.parse(savedData);
+    } catch (error) {
+      console.error("Failed to load saved data:", error);
+    }
+  }
+
+  return structuredClone(mockData);
+}
+
+
+function saveDatabase() {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(db)
+  );
+}
+
+
+let db = loadDatabase();
 // No real auth yet (that's Person A's Cognito work) -- hardcode
 // "logged in as" Alex (user_id 1) for now. Swap this out once
 // Cognito sessions exist.
@@ -52,7 +77,14 @@ export async function getCurrentUser() {
 }
 
 export async function updateUser(userId, updates) {
-  db.users = db.users.map((u) => (u.user_id === userId ? { ...u, ...updates } : u));
+  db.users = db.users.map((u) =>
+    u.user_id === userId
+      ? { ...u, ...updates }
+      : u
+  );
+
+  saveDatabase();
+
   return getUser(userId);
 }
 
@@ -107,6 +139,9 @@ export async function addGroup(
       joined_at: new Date().toISOString(),
     },
   ];
+
+  saveDatabase();
+
   return newGroup;
 }
 
@@ -136,6 +171,8 @@ export async function joinGroup(inviteCode, userId = CURRENT_USER_ID) {
         joined_at: new Date().toISOString(),
       },
     ];
+
+    saveDatabase();
   }
 
   return group;
@@ -189,6 +226,7 @@ export async function togglePaymentStatus(groupId, activityRef, fromUserId, toUs
       ? { ...p, paid: !p.paid }
       : p
   );
+  saveDatabase();
   return getPayments(groupId);
 }
 
@@ -214,4 +252,11 @@ export async function getUserLedger(userId) {
   });
 
   return { owesOthers, owedByOthers };
+}
+
+export function resetMockData() {
+  db = structuredClone(mockData);
+
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem("currentUserId");
 }
