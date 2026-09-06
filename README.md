@@ -2,6 +2,27 @@
 
 A group trip planning application that helps groups coordinate itineraries, preferences, and shared costs.
 
+## Person B: Trip Preferences & Itinerary Agent
+
+The Person B module includes a React preference form, Claude/Bedrock planning, conflict flags,
+and manual recalculation using the previous itinerary. Run the local fixture demo:
+
+```bash
+npm.cmd --prefix frontend/itinerary install
+npm.cmd --prefix frontend/itinerary run build
+python -m backend.itinerary.local_server
+```
+
+Open http://127.0.0.1:8765. This demo uses sample members and fixed, labelled output;
+use `--live` after configuring Bedrock to test real Claude generation.
+
+See [Person B setup and team handoff](docs/person-b.md) for the standalone Claude
+smoke test, proposed database fields, API routes, frontend integration, and itinerary
+JSON contract for Persons A and C. DynamoDB and Cognito are the agreed services;
+the exact shared table fields still need to be confirmed with Person A.
+
+Run backend tests with `python -m unittest discover -s tests -v`.
+
 The project aims to:
 - Collect user profiles and trip preferences
 - Generate itineraries based on group constraints
@@ -17,7 +38,9 @@ The project aims to:
 - **AWS Lambda** — serverless backend functions
 - **AWS IAM** — AWS permissions and access management
 
-Additional services for the frontend, database, authentication, and AI components are still being finalised.
+The agreed application stack also uses **React**, **AWS API Gateway**, **DynamoDB**,
+**Amazon Cognito**, and **Amazon Bedrock**. Frontend hosting will use **AWS Amplify**
+or **S3/CloudFront** (choice pending).
 
 ---
 
