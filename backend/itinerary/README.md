@@ -15,6 +15,15 @@ To try it, use the commands below. The normal demo uses sample output and needs
 no AWS login. Add `--live` to use real Claude after setting up your AWS access.
 Demo data resets when the Python server restarts, even in live mode.
 
+The integrated dashboard now saves profiles, memberships, and displayed itinerary
+rows in browser storage. Planner preferences and the full draft still live in the
+Python server's memory; restarting that server resets them.
+
+The merged Person A flow currently works locally. Its AWS handlers still need
+database helpers in `backend/shared/db.py`, corrected create/get profile handlers,
+and a shared profile/group schema with the planner (dietary/blacklist arrays and
+group currency). Do not treat the local dashboard as proof of AWS integration.
+
 Teammates should use their own AWS login. Keep credentials private and do not
 commit `.env`. See the [setup guide](../../docs/person-b.md) when ready to connect AWS.
 

@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getGroups } from "../dataService";
+import { getUserGroups } from "../dataService";
+import { useCurrentUser } from "../UserContext";
 import { colors, card, sectionTitle } from "../styles";
 
 export default function Itineraries() {
   const [groups, setGroups] = useState([]);
+
   const navigate = useNavigate();
+  const { currentUserId } = useCurrentUser();
 
   useEffect(() => {
-    getGroups().then(setGroups);
-  }, []);
+    getUserGroups(currentUserId).then(setGroups);
+  }, [currentUserId]);
 
   return (
     <div>

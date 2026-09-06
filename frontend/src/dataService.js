@@ -25,8 +25,33 @@ import { plannerInput, itineraryRows } from './itinerary/adapter';
 // Deep-clone the initial mock data into mutable in-memory "tables".
 // Using structuredClone so edits during the session don't mutate the
 // original imported mockData object.
-let db = structuredClone(mockData);
+const STORAGE_KEY = "tripPlannerData";
 
+
+function loadDatabase() {
+  const savedData = localStorage.getItem(STORAGE_KEY);
+
+  if (savedData) {
+    try {
+      return JSON.parse(savedData);
+    } catch (error) {
+      console.error("Failed to load saved data:", error);
+    }
+  }
+
+  return structuredClone(mockData);
+}
+
+
+function saveDatabase() {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(db)
+  );
+}
+
+
+let db = loadDatabase();
 // No real auth yet (that's Person A's Cognito work) -- hardcode
 // "logged in as" Alex (user_id 1) for now. Swap this out once
 // Cognito sessions exist.
@@ -53,7 +78,14 @@ export async function getCurrentUser() {
 }
 
 export async function updateUser(userId, updates) {
-  db.users = db.users.map((u) => (u.user_id === userId ? { ...u, ...updates } : u));
+  db.users = db.users.map((u) =>
+    u.user_id === userId
+      ? { ...u, ...updates }
+      : u
+  );
+
+  saveDatabase();
+
   return getUser(userId);
 }
 
@@ -99,9 +131,76 @@ export async function addGroup(
   };
 
   db.groups = [...db.groups, newGroup];
-  // The local organizer is the first member; their planner preferences start pending.
-  db.tripPreferences = [...db.tripPreferences, { group_id: newGroupId, user_id: organizerUserId }];
+
+  db.groupMembers = [
+    ...db.groupMembers,
+    {
+      group_id: newGroupId,
+      user_id: organizerUserId,
+      joined_at: new Date().toISOString(),
+    },
+  ];
+
+  saveDatabase();
+
+
   return newGroup;
+}
+
+export async function joinGroup(inviteCode, userId = CURRENT_USER_ID) {
+  const normalizedCode = inviteCode.trim().toUpperCase();
+
+  const group = db.groups.find(
+    (g) => g.invite_code.toUpperCase() === normalizedCode
+  );
+
+  if (!group) {
+    throw new Error("Invalid invite code.");
+  }
+
+  const alreadyMember = db.groupMembers.some(
+    (member) =>
+      member.group_id === group.group_id &&
+      member.user_id === userId
+  );
+
+  if (!alreadyMember) {
+    db.groupMembers = [
+      ...db.groupMembers,
+      {
+        group_id: group.group_id,
+        user_id: userId,
+        joined_at: new Date().toISOString(),
+      },
+    ];
+
+    saveDatabase();
+  }
+
+  return group;
+}
+
+export async function getGroupMembers(groupId) {
+  const memberships = db.groupMembers.filter(
+    (member) => String(member.group_id) === String(groupId)
+  );
+
+  return memberships
+    .map((membership) =>
+      db.users.find((user) => user.user_id === membership.user_id)
+    )
+    .filter(Boolean);
+}
+
+
+export async function getUserGroups(userId) {
+  const groupIds = db.groupMembers
+    .filter((member) => member.user_id === userId)
+    .map((member) => member.group_id);
+
+  return db.groups.filter((group) =>
+    groupIds.includes(group.group_id)
+  );
 }
 
 // ---------------------------------------------------------------
@@ -136,7 +235,7 @@ export async function connectPlanner(groupId, userId) {
   if (!liveApi) {
     const group = await getGroup(groupId);
     if (!group) throw new Error('Trip not found.');
-    const input = plannerInput(group, db.users, db.tripPreferences);
+    const input = plannerInput(group, db.users, db.groupMembers);
     if (!input.members.some(m => m.user_id === String(userId))) throw new Error('Only trip members can open the planner.');
     await request('/demo/import', 'POST', input);
   }
@@ -145,6 +244,7 @@ export async function connectPlanner(groupId, userId) {
 
 export function savePlannerResult(record, groupId) {
   db.itinerary = [...db.itinerary.filter(row => row.group_id !== groupId), ...itineraryRows(record, groupId, db.users)];
+  saveDatabase();
 }
 
 // ---------------------------------------------------------------
@@ -164,6 +264,7 @@ export async function togglePaymentStatus(groupId, activityRef, fromUserId, toUs
       ? { ...p, paid: !p.paid }
       : p
   );
+  saveDatabase();
   return getPayments(groupId);
 }
 
@@ -189,4 +290,11 @@ export async function getUserLedger(userId) {
   });
 
   return { owesOthers, owedByOthers };
+}
+
+export function resetMockData() {
+  db = structuredClone(mockData);
+
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem("currentUserId");
 }

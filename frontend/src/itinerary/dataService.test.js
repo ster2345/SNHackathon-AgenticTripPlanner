@@ -1,4 +1,15 @@
-import { addGroup, connectPlanner, getPayments, getItinerary, savePlannerResult } from '../dataService';
+import { addGroup, joinGroup, connectPlanner, getPayments, getItinerary, savePlannerResult } from '../dataService';
+
+test('joining a trip adds the new member to the planner with pending preferences', async () => {
+  global.fetch = jest.fn(async () => ({ok: true, json: async () => ({status: 'imported'})}));
+  const group = await addGroup({tripName: 'Joined trip', destination: 'Osaka', startDate: '2026-11-14', endDate: '2026-11-16'}, 1);
+  await joinGroup(group.invite_code, 2);
+  await joinGroup(group.invite_code, 2);
+  await connectPlanner(group.group_id, 2);
+  const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+  expect(payload.members.map(member => member.user_id)).toEqual(['1', '2']);
+  expect(payload.members.every(member => member.preferences === null)).toBe(true);
+});
 
 afterEach(() => { delete window.TRIP_PLANNER_CONFIG; delete global.fetch; });
 

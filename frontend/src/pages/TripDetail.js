@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getGroup, getItinerary, getUsers } from "../dataService";
+import { getGroup, getItinerary, getUsers, getGroupMembers } from "../dataService";
 import { colors, card, sectionTitle } from "../styles";
 import PlannerPanel from '../itinerary/PlannerPanel';
 import { useCurrentUser } from '../UserContext';
@@ -55,12 +55,14 @@ export default function TripDetail() {
   const [itinerary, setItinerary] = useState([]);
   const [users, setUsers] = useState([]);
   const [expandedDay, setExpandedDay] = useState(null);
+  const [groupMembers, setGroupMembers] = useState([]);
 
   useEffect(() => {
     const id = Number(groupId);
     getGroup(id).then(setGroup);
     getItinerary(id).then(setItinerary);
     getUsers().then(setUsers);
+    getGroupMembers(id).then(setGroupMembers);
   }, [groupId]);
 
   if (!group) return <p>Loading trip...</p>;
@@ -105,6 +107,43 @@ export default function TripDetail() {
         {totalFlags > 0 && (
           <div style={styles.flagBanner}>
             &#9888; {totalFlags} potential conflict{totalFlags > 1 ? "s" : ""} flagged below
+          </div>
+        )}
+      </div>
+
+      <h3
+        style={{
+          ...sectionTitle,
+          fontSize: "17px",
+          marginTop: "24px",
+        }}
+      >
+        Trip Members
+      </h3>
+
+      <div style={card}>
+        {groupMembers.length === 0 ? (
+          <p>No members yet.</p>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
+            {groupMembers.map((member) => (
+              <span
+                key={member.user_id}
+                style={{
+                  ...styles.metaChip,
+                  fontSize: "13px",
+                  padding: "6px 10px",
+                }}
+              >
+                {member.name}
+              </span>
+            ))}
           </div>
         )}
       </div>
