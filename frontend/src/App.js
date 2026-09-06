@@ -9,6 +9,7 @@ import NewTrip from "./pages/NewTrip";
 import Ledger from "./pages/Ledger";
 import { page } from "./styles";
 import { UserProvider } from "./UserContext";
+import JoinTrip from "./pages/JoinTrip";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
             <Route path="/itineraries/:groupId" element={<TripDetail />} />
             <Route path="/new-trip" element={<NewTrip />} />
             <Route path="/ledger" element={<Ledger />} />
+            <Route path="/join-trip" element={<JoinTrip />} />
           </Routes>
         </div>
       </BrowserRouter>
