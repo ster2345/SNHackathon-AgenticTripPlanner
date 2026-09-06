@@ -98,6 +98,48 @@ export const mockData = {
       "organizer_user_id": 7
     }
   ],
+  "groupMembers": [
+    {
+      "group_id": 1,
+      "user_id": 1,
+      "joined_at": "2026-09-01T10:00:00Z"
+    },
+    {
+      "group_id": 1,
+      "user_id": 2,
+      "joined_at": "2026-09-01T10:00:00Z"
+    },
+    {
+      "group_id": 1,
+      "user_id": 3,
+      "joined_at": "2026-09-01T10:00:00Z"
+    },
+    {
+      "group_id": 1,
+      "user_id": 4,
+      "joined_at": "2026-09-01T10:00:00Z"
+    },
+    {
+      "group_id": 2,
+      "user_id": 5,
+      "joined_at": "2026-09-01T10:00:00Z"
+    },
+    {
+      "group_id": 2,
+      "user_id": 6,
+      "joined_at": "2026-09-01T10:00:00Z"
+    },
+    {
+      "group_id": 2,
+      "user_id": 7,
+      "joined_at": "2026-09-01T10:00:00Z"
+    },
+    {
+      "group_id": 2,
+      "user_id": 8,
+      "joined_at": "2026-09-01T10:00:00Z"
+    }
+  ],
   "tripPreferences": [
     {
       "group_id": 1,

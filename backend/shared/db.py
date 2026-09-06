@@ -1,39 +1,48 @@
-import os
-
-import boto3
-from dotenv import load_dotenv
+import json
+from decimal import Decimal
 
 
-# Load local environment variables from .env
-load_dotenv()
+def json_serializer(value):
+    if isinstance(value, Decimal):
+        return int(value) if value % 1 == 0 else float(value)
+
+    raise TypeError(f"Type {type(value)} is not JSON serializable")
 
 
-AWS_REGION = os.getenv("AWS_REGION", "ap-southeast-1")
-
-dynamodb = boto3.resource(
-    "dynamodb",
-    region_name=AWS_REGION
-)
-
-
-def get_table(env_variable):
-    table_name = os.getenv(env_variable)
-
-    if not table_name:
-        raise RuntimeError(
-            f"Environment variable {env_variable} is not configured."
-        )
-
-    return dynamodb.Table(table_name)
+def make_response(status_code, body):
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+        },
+        "body": json.dumps(body, default=json_serializer)
+    }
 
 
-def get_users_table():
-    return get_table("USERS_TABLE")
+def success(body):
+    return make_response(200, body)
 
 
-def get_groups_table():
-    return get_table("GROUPS_TABLE")
+def created(body):
+    return make_response(201, body)
 
 
-def get_group_members_table():
-    return get_table("GROUP_MEMBERS_TABLE")
+def bad_request(message):
+    return make_response(400, {"error": message})
+
+
+def unauthorized(message="Unauthorized"):
+    return make_response(401, {"error": message})
+
+
+def not_found(message="Not found"):
+    return make_response(404, {"error": message})
+
+
+def conflict(message):
+    return make_response(409, {"error": message})
+
+
+def server_error(message="Internal server error"):
+    return make_response(500, {"error": message})

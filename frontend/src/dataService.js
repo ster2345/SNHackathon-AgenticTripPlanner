@@ -98,7 +98,70 @@ export async function addGroup(
   };
 
   db.groups = [...db.groups, newGroup];
+
+  db.groupMembers = [
+    ...db.groupMembers,
+    {
+      group_id: newGroupId,
+      user_id: organizerUserId,
+      joined_at: new Date().toISOString(),
+    },
+  ];
   return newGroup;
+}
+
+export async function joinGroup(inviteCode, userId = CURRENT_USER_ID) {
+  const normalizedCode = inviteCode.trim().toUpperCase();
+
+  const group = db.groups.find(
+    (g) => g.invite_code.toUpperCase() === normalizedCode
+  );
+
+  if (!group) {
+    throw new Error("Invalid invite code.");
+  }
+
+  const alreadyMember = db.groupMembers.some(
+    (member) =>
+      member.group_id === group.group_id &&
+      member.user_id === userId
+  );
+
+  if (!alreadyMember) {
+    db.groupMembers = [
+      ...db.groupMembers,
+      {
+        group_id: group.group_id,
+        user_id: userId,
+        joined_at: new Date().toISOString(),
+      },
+    ];
+  }
+
+  return group;
+}
+
+export async function getGroupMembers(groupId) {
+  const memberships = db.groupMembers.filter(
+    (member) => String(member.group_id) === String(groupId)
+  );
+
+  return memberships
+    .map((membership) =>
+      db.users.find((user) => user.user_id === membership.user_id)
+    )
+    .filter(Boolean);
+}
+
+
+export async function getUserGroups(userId) {
+  const groupIds = db.groupMembers
+    .filter((member) => member.user_id === userId)
+    .map((member) => member.group_id);
+
+  return db.groups.filter((group) =>
+    groupIds.includes(group.group_id)
+  );
 }
 
 // ---------------------------------------------------------------

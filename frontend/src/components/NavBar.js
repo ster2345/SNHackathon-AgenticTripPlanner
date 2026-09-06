@@ -9,6 +9,7 @@ const navItems = [
   { to: "/profile", label: "User Profile" },
   { to: "/itineraries", label: "Itineraries" },
   { to: "/new-trip", label: "New Trip" },
+  { to: "/join-trip", label: "Join Trip" },
   { to: "/ledger", label: "Ledger" },
 ];
 

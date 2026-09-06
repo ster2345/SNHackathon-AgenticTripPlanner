@@ -23,8 +23,8 @@ function App() {
             <Route path="/itineraries" element={<Itineraries />} />
             <Route path="/itineraries/:groupId" element={<TripDetail />} />
             <Route path="/new-trip" element={<NewTrip />} />
-            <Route path="/ledger" element={<Ledger />} />
             <Route path="/join-trip" element={<JoinTrip />} />
+            <Route path="/ledger" element={<Ledger />} />
           </Routes>
         </div>
       </BrowserRouter>
