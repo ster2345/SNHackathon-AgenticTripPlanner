@@ -3,12 +3,14 @@ import { NavLink } from "react-router-dom";
 import { colors } from "../styles";
 import { getUsers } from "../dataService";
 import { useCurrentUser } from "../UserContext";
+import { resetMockData } from "../dataService";
 
 const navItems = [
   { to: "/", label: "Home", end: true },
   { to: "/profile", label: "User Profile" },
   { to: "/itineraries", label: "Itineraries" },
   { to: "/new-trip", label: "New Trip" },
+  { to: "/join-trip", label: "Join Trip" },
   { to: "/ledger", label: "Ledger" },
 ];
 
@@ -19,6 +21,20 @@ export default function NavBar() {
   useEffect(() => {
     getUsers().then(setUsers);
   }, []);
+
+  const handleResetDemo = () => {
+    const confirmed = window.confirm(
+      "Reset all demo data back to the original state?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    resetMockData();
+
+    window.location.href = "/";
+  };
 
   return (
     <nav style={styles.nav}>
@@ -56,6 +72,16 @@ export default function NavBar() {
               </option>
             ))}
           </select>
+          <button
+            onClick={handleResetDemo}
+            style={{
+              padding: "6px 10px",
+              fontSize: "12px",
+              cursor: "pointer",
+            }}
+          >
+            Reset Demo
+          </button>
         </div>
       </div>
     </nav>
