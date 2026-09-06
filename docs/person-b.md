@@ -246,6 +246,12 @@ Refresh Person C's dashboard after the plan POST completes if it displays estima
 
 ## Verification
 
+Bedrock throttling returns HTTP 429 with a wait/quota message. The SDK uses standard
+exponential backoff with jitter and at most two total attempts per model call.
+Persistent throttling requires waiting or reviewing the model's request/token quotas;
+short retries cannot resolve exhausted minute/day quotas. The JSON repair loop does
+not retry throttling errors, and existing saved itineraries remain unchanged.
+
 Every new activity has application-assigned `verification_status: "unverified"`, and
 the UI labels every suggestion as unverified. No venue or route data source is connected;
 model prose is not evidence of certification, accessibility, or dietary suitability.
@@ -281,3 +287,19 @@ Production DynamoDB integration requires the agreed tables, keys, and IAM permis
 The existing IAM sample permits a specific older model; reconcile it with the exact
 `BEDROCK_MODEL_ID` you choose. Inference profiles may require additional profile and
 destination model resources in IAM; do not broaden permissions to arbitrary services.
+
+## Request limits
+
+Bedrock input (system prompt plus serialized group/prior plan) is capped at 24,000
+UTF-8 bytes; larger input is rejected with 413 before invoking AWS. No restrictions
+or earlier activities are silently truncated. Output is capped at 3,000 tokens
+(smoke tests still use 32). Concise 2-3 activity days are requested; a truncated
+response is rejected rather than saved.
+
+Each generation has a 60-second elapsed-time budget covering its optional JSON repair.
+SDK retries are capped at two total attempts per call (at most four across JSON repair).
+Connect timeout is 3 seconds and read timeout at most 20 seconds, reduced as the
+budget runs out. Expired budgets prevent another attempt or a late save; network
+timeouts return 504. Socket timeouts are not hard cancellation of work already sent
+to AWS; local scheduling/network behavior may delay return beyond the budget.
+No endless retry or retry of a timeout in the JSON repair loop occurs.

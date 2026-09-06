@@ -30,6 +30,13 @@ class PlannerTests(unittest.TestCase):
             self.service.plan("osaka", "alex")
         self.assertEqual(caught.exception.status, 409)
 
+    def test_generation_over_budget_does_not_save(self):
+        with patch('backend.itinerary.limits.time.monotonic', side_effect=[0, 0, 61]):
+            with self.assertRaises(Problem) as caught:
+                self.service.plan('osaka', 'alex')
+        self.assertEqual(caught.exception.status, 504)
+        self.assertIsNone(self.store.current)
+
     def test_inactive_member_does_not_block(self):
         self.store.people[1].pop("preferences")
         self.store.people[1]["status"] = "left"

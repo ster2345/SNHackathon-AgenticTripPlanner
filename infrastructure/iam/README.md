@@ -6,12 +6,14 @@ Sonnet v2). `.env.example` now selects the same model, and explicitly names the
 The policy is a permission document, not an automatically applied configuration.
 Changing this file does not attach permissions in AWS or enable model access.
 
-The model ID being consistent does not prove availability: the team's older Sonnet
-model must still be available to your account in the chosen region. The current
-configuration uses a direct model ID, not a global/APAC profile. If AWS requires a
-profile or reports the model unavailable/retired, the team must select a supported
-model/profile and update the policy and configuration together. Do not silently
-switch back to the personal Haiku model or add `bedrock:*` permissions.
+For Singapore, use `apac.anthropic.claude-3-5-sonnet-20241022-v2:0`.
+The direct foundation-model ID fails with on-demand throughput unsupported.
+This is the same team model, invoked through its APAC inference profile.
+The rendered policy authorizes the exact profile in your account and the underlying
+model across routing regions, conditional on that profile. It does not authorize
+other Claude models. Requests can be processed outside Singapore within APAC.
+Changing local policy files does not update an already attached AWS policy: regenerate
+the JSON and edit the existing IAM user policy before rerunning the smoke test.
 
 ## Personal SSO account
 
