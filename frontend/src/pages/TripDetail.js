@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getGroup, getItinerary, getUsers } from "../dataService";
-import { colors, card, sectionTitle, button } from "../styles";
+import { colors, card, sectionTitle } from "../styles";
+import PlannerPanel from '../itinerary/PlannerPanel';
+import { useCurrentUser } from '../UserContext';
 
 function groupByDay(itineraryRows) {
   const days = {};
@@ -27,10 +29,10 @@ function groupByDay(itineraryRows) {
 // reading `day.summary` (or whatever field name B's JSON uses)
 // instead of generating one here.
 // ---------------------------------------------------------------
-function summarizeDay(day) {
+function summarizeDay(day, userId) {
   const count = day.activities.length;
   const flagCount = day.activities.filter((a) => a.flag).length;
-  const totalCost = day.activities.reduce((sum, a) => sum + (a.est_cost_per_person || 0), 0);
+  const totalCost = day.activities.filter(a => a.split_among_user_ids.includes(userId)).reduce((sum, a) => sum + (a.est_cost_per_person || 0), 0);
   const mainActivities = day.activities
     .filter((a) => a.est_cost_per_person > 0 || day.activities.length <= 2)
     .slice(0, 2)
@@ -39,7 +41,7 @@ function summarizeDay(day) {
 
   let summary = `${count} activit${count === 1 ? "y" : "ies"}`;
   if (mainActivities) summary += ` — ${mainActivities}`;
-  if (totalCost > 0) summary += ` · ~$${totalCost}/person`;
+  if (totalCost > 0) summary += ` · ~$${totalCost} for you`;
   if (flagCount > 0) summary += ` · ${flagCount} flag${flagCount > 1 ? "s" : ""} to check`;
 
   return summary;
@@ -48,6 +50,7 @@ function summarizeDay(day) {
 export default function TripDetail() {
   const { groupId } = useParams();
   const navigate = useNavigate();
+  const { currentUserId } = useCurrentUser();
   const [group, setGroup] = useState(null);
   const [itinerary, setItinerary] = useState([]);
   const [users, setUsers] = useState([]);
@@ -65,7 +68,7 @@ export default function TripDetail() {
   const getUserName = (id) => users.find((u) => u.user_id === id)?.name || `User ${id}`;
   const days = groupByDay(itinerary);
   const totalFlags = itinerary.filter((i) => i.flag).length;
-  const totalEstCost = itinerary.reduce((sum, i) => sum + (i.est_cost_per_person || 0), 0);
+  const totalEstCost = itinerary.filter(i => i.split_among_user_ids.includes(currentUserId)).reduce((sum, i) => sum + (i.est_cost_per_person || 0), 0);
 
   return (
     <div>
@@ -74,6 +77,8 @@ export default function TripDetail() {
       </button>
 
       <h2 style={{ ...sectionTitle, marginTop: "8px" }}>{group.trip_name}</h2>
+      <PlannerPanel key={`${groupId}-${currentUserId}`} groupId={Number(groupId)} userId={currentUserId}
+        onSaved={() => getItinerary(Number(groupId)).then(setItinerary)} />
 
       {/* --- Summary --- */}
       <div style={{ ...card, ...styles.summaryCard }}>
@@ -93,7 +98,7 @@ export default function TripDetail() {
             <div style={styles.summaryValue}>{group.invite_code}</div>
           </div>
           <div>
-            <div style={styles.summaryLabel}>Est. total per person</div>
+            <div style={styles.summaryLabel}>Your activity estimate</div>
             <div style={styles.summaryValue}>${totalEstCost}</div>
           </div>
         </div>
@@ -122,7 +127,7 @@ export default function TripDetail() {
                 <span style={styles.dayTitle}>
                   Day {dayNum} <span style={styles.dayDate}>{day.date}</span>
                 </span>
-                <span style={styles.daySummary}>{summarizeDay(day)}</span>
+                <span style={styles.daySummary}>{summarizeDay(day, currentUserId)}</span>
               </span>
               <span style={styles.dayMeta}>
                 {dayFlags > 0 && <span style={styles.dayFlagBadge}>{dayFlags} flag{dayFlags > 1 ? "s" : ""}</span>}

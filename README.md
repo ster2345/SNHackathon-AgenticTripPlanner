@@ -4,6 +4,19 @@ A group trip planning application that helps groups coordinate itineraries, pref
 
 ## Person B: Trip Preferences & Itinerary Agent
 
+The latest team dashboard is integrated with Person B's planner. Build and run it:
+
+```powershell
+npm.cmd --prefix frontend ci
+npm.cmd --prefix frontend run build
+python -m backend.itinerary.local_server --dashboard --port 8768
+```
+
+Open http://127.0.0.1:8768, then Itineraries → Osaka → Open planner.
+This is a local fixture flow; add `--live` with the configured Python environment
+to call Bedrock. [AWS/SSO setup and permission checks](infrastructure/iam/README.md)
+explain how to test the team's model and DynamoDB schemas in a personal account.
+
 The Person B module includes a React preference form, Claude/Bedrock planning, conflict flags,
 and manual recalculation using the previous itinerary. Run the local fixture demo:
 

@@ -8,6 +8,40 @@ No accounts, group creation, actual bookings, or payment processing are added he
 
 ## Run locally
 
+The team dashboard from `main` is now integrated. To use it:
+
+```powershell
+npm.cmd --prefix frontend ci
+npm.cmd --prefix frontend run build
+python -m backend.itinerary.local_server --dashboard --port 8768
+```
+
+Open http://127.0.0.1:8768, choose Itineraries, open the Osaka trip, and click
+**Open planner**. Use the dashboard's user switcher to enter each member's
+preferences; reopen the planner after switching. Submitted preferences survive
+these imports until the Python server restarts. Profiles/membership are refreshed
+when opening the planner. The supplied date-flexibility text and dollar ranges
+are not silently converted to numeric constraints: each member enters the planner's
+explicit preference form. The seven-day New Zealand fixture is rejected by the
+current one-to-five-day limit. Imported trips remain memory-only local fixtures.
+
+For Claude use `.\.venv\bin\python.exe -m backend.itinerary.local_server --dashboard --live --port 8768`
+after the team model smoke test passes. Saved plans update the existing dashboard
+itinerary rows, preserving numeric dashboard IDs, while payments are untouched.
+The frontend fixture state resets on refresh; reopening the planner retrieves the
+Python copy while that server stays running. Profiles are sourced from the dashboard
+again on each open, so refresh also restores the initial profile fixtures.
+
+The shared React source is now `frontend/src/itinerary/TripPlanner.jsx`, with scoped
+styles in `planner.css`. The separate Vite demo imports that component; it is not a
+second implementation. A host API request adapter connects the main dashboard to
+the same backend routes. Hosted use requires `window.TRIP_PLANNER_CONFIG` with
+`apiBase` and a Cognito `getToken` function. Person A must still replace the mock
+account/group data with real records whose membership IDs match Cognito subjects.
+
+See [AWS permission setup](../infrastructure/iam/README.md) for SSO, model alignment,
+account-scoped permissions, and the read-only table schema check.
+
 From the repository root:
 
 ```powershell

@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from .bedrock import call_claude
 from .demo import DemoStore, fixture_model
+from .dashboard_demo import DashboardStore
 from .itinerary_lambda import dispatch
 from .planner import Problem
 from .service import ItineraryService
@@ -20,6 +21,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--dashboard", action="store_true", help="Serve the integrated team dashboard build")
     args = parser.parse_args()
     if args.live:
         from dotenv import load_dotenv
@@ -27,7 +29,10 @@ def main():
     store = DemoStore()
     service = ItineraryService(store, call_claude if args.live else fixture_model,
                                "bedrock" if args.live else "demo-fixture")
+    dashboard_stores = {}
     root = (Path(__file__).resolve().parents[2] / "frontend" / "itinerary" / "dist").resolve()
+    if args.dashboard:
+        root = (Path(__file__).resolve().parents[2] / 'frontend' / 'build').resolve()
 
     class Handler(BaseHTTPRequestHandler):
         def respond(self, status, value):
@@ -40,10 +45,13 @@ def main():
 
         def do_GET(self):
             path = urlsplit(self.path).path
-            if path == "/" or path.startswith("/assets/"):
+            if path == "/" or path.startswith("/assets/") or (args.dashboard and not path.startswith(('/groups/', '/demo/'))):
                 asset = (root / ("index.html" if path == "/" else path.lstrip("/"))).resolve()
+                if args.dashboard and not asset.suffix:
+                    asset = root / 'index.html'
                 if not asset.is_relative_to(root) or not asset.is_file():
-                    self.respond(404, {"error": "React build not found. Run npm.cmd install and npm.cmd run build in frontend/itinerary."})
+                    location = 'frontend' if args.dashboard else 'frontend/itinerary'
+                    self.respond(404, {"error": f"React build not found. Run npm.cmd ci and npm.cmd run build in {location}."})
                     return
                 self.send_response(200)
                 self.send_header("Content-Type", (mimetypes.guess_type(asset.name)[0] or "application/octet-stream") + "; charset=utf-8")
@@ -64,7 +72,15 @@ def main():
                 if not isinstance(body, dict):
                     raise Problem("Request body must be an object.")
                 uid = self.headers.get("X-Demo-User", "alex")
-                if path == "/demo/membership" and self.command == "POST":
+                if path == '/demo/import' and self.command == 'POST':
+                    gid = body.get('group', {}).get('group_id') if isinstance(body.get('group'), dict) else None
+                    if gid in dashboard_stores:
+                        dashboard_stores[gid].update(body)
+                    else:
+                        imported = DashboardStore(body)
+                        dashboard_stores[imported.group_data['group_id']] = imported
+                    result = {'status': 'imported'}
+                elif path == "/demo/membership" and self.command == "POST":
                     target = body.get("user_id")
                     if target == "alex" or target not in ("sam", "priya") or type(body.get("active")) is not bool:
                         raise Problem("Choose Sam or Priya and a boolean active status.")
@@ -73,7 +89,9 @@ def main():
                             member["status"] = "active" if body["active"] else "left"
                     result = {"status": "updated"}
                 else:
-                    result = dispatch(service, self.command, path, uid, body)
+                    gid = path.split('/')[2] if path.startswith('/groups/') else None
+                    selected = ItineraryService(dashboard_stores[gid], service.model, service.source) if gid in dashboard_stores else service
+                    result = dispatch(selected, self.command, path, uid, body)
                 self.respond(200, result)
             except Problem as exc:
                 self.respond(exc.status, {"error": str(exc)})

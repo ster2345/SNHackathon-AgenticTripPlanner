@@ -1,4 +1,21 @@
-# Getting Started with Create React App
+# Team dashboard with the Person B itinerary planner
+
+From the repository root, run `npm.cmd --prefix frontend ci`, then
+`npm.cmd --prefix frontend run build`, then
+`python -m backend.itinerary.local_server --dashboard --port 8768`.
+Open http://127.0.0.1:8768 and select Itineraries → Osaka → Open planner.
+Switch members using the existing navigation dropdown to submit each member's
+preferences. The demo imports profiles and keeps planner state in Python memory.
+Add `--live` with your configured Python environment to call Bedrock.
+
+The shared planner lives in `src/itinerary`; the separate `itinerary/` Vite demo
+imports it. Scoped planner CSS preserves the team dashboard's existing styling.
+See [Person B handoff](../docs/person-b.md) for the API configuration and limitations.
+
+For the integrated local API flow use the Python-served build above. `npm start`
+only starts the CRA frontend and does not proxy planner API routes.
+
+## Original Create React App commands
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 

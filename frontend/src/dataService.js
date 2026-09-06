@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------
 
 import { mockData } from "./mockData";
+import { plannerInput, itineraryRows } from './itinerary/adapter';
 
 // Deep-clone the initial mock data into mutable in-memory "tables".
 // Using structuredClone so edits during the session don't mutate the
@@ -98,6 +99,8 @@ export async function addGroup(
   };
 
   db.groups = [...db.groups, newGroup];
+  // The local organizer is the first member; their planner preferences start pending.
+  db.tripPreferences = [...db.tripPreferences, { group_id: newGroupId, user_id: organizerUserId }];
   return newGroup;
 }
 
@@ -107,6 +110,41 @@ export async function addGroup(
 
 export async function getItinerary(groupId) {
   return db.itinerary.filter((i) => i.group_id === groupId);
+}
+
+// Host may supply {apiBase, getToken} using Person A's Cognito session.
+// There is no automatic fallback to mock identity on a hosted site.
+export async function connectPlanner(groupId, userId) {
+  const config = window.TRIP_PLANNER_CONFIG;
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  const liveApi = !!config?.getToken;
+  if (!liveApi && !local) throw new Error('Connect a Cognito session and API Gateway endpoint first.');
+  const base = liveApi ? config.apiBase || '' : '';
+  const request = async (path, method = 'GET', body) => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (liveApi) {
+      const token = await config.getToken();
+      if (!token) throw new Error('Sign in to access this trip.');
+      headers.Authorization = `Bearer ${token}`;
+    } else headers['X-Demo-User'] = String(userId);
+    const response = await fetch(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    let data;
+    try { data = await response.json(); } catch { throw new Error('Start the Python dashboard server or configure the API connection.'); }
+    if (!response.ok) throw new Error(data.error || `Planner request failed (${response.status})`);
+    return data;
+  };
+  if (!liveApi) {
+    const group = await getGroup(groupId);
+    if (!group) throw new Error('Trip not found.');
+    const input = plannerInput(group, db.users, db.tripPreferences);
+    if (!input.members.some(m => m.user_id === String(userId))) throw new Error('Only trip members can open the planner.');
+    await request('/demo/import', 'POST', input);
+  }
+  return { request };
+}
+
+export function savePlannerResult(record, groupId) {
+  db.itinerary = [...db.itinerary.filter(row => row.group_id !== groupId), ...itineraryRows(record, groupId, db.users)];
 }
 
 // ---------------------------------------------------------------
