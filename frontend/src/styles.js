@@ -5,43 +5,27 @@
 export const colors = {
 
   ink: "#304C5C",        // vintage navy, headings & nav
-
   accent: "#D29B45",     // ochre, CTAs & highlights
-
   accentSoft: "#F8EEDB",
-
   warn: "#B97832",
-
   warnBg: "#FFF1D6",
-
   good: "#5C7958",
-
   goodBg: "#E5EFE2",
-
   bad: "#B95F4B",
-
   badBg: "#F8E5DF",
-
   paper: "#F4E9D3",      // warm postcard cream
-
   border: "#DED2BC",
-
   text: "#30404A",
-
   textMuted: "#6F7470",
-
 };
 
 
 // Fonts
 export const fonts = {
-
   // Fancy serif font for ALL headings and TripSync logo
   heading: "'Cormorant Garamond', Georgia, serif",
-
   // Keep small/normal text clean and readable
   body: "'Segoe UI', system-ui, sans-serif",
-
 };
 
 

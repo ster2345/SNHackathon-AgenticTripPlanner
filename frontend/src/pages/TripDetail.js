@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getGroup, getItinerary, getUsers, getGroupMembers } from "../dataService";
-import { colors, card, sectionTitle } from "../styles";
-import PlannerPanel from '../itinerary/PlannerPanel';
-import { useCurrentUser } from '../UserContext';
+import { getGroup, getItinerary, getUsers, getGroupMembers, getPayments, addExpense } from "../dataService";
+import { colors, card, sectionTitle, button, fonts, input, label } from "../styles";
 
 function groupByDay(itineraryRows) {
   const days = {};
@@ -29,10 +27,10 @@ function groupByDay(itineraryRows) {
 // reading `day.summary` (or whatever field name B's JSON uses)
 // instead of generating one here.
 // ---------------------------------------------------------------
-function summarizeDay(day, userId) {
+function summarizeDay(day) {
   const count = day.activities.length;
   const flagCount = day.activities.filter((a) => a.flag).length;
-  const totalCost = day.activities.filter(a => a.split_among_user_ids.includes(userId)).reduce((sum, a) => sum + (a.est_cost_per_person || 0), 0);
+  const totalCost = day.activities.reduce((sum, a) => sum + (a.est_cost_per_person || 0), 0);
   const mainActivities = day.activities
     .filter((a) => a.est_cost_per_person > 0 || day.activities.length <= 2)
     .slice(0, 2)
@@ -41,7 +39,7 @@ function summarizeDay(day, userId) {
 
   let summary = `${count} activit${count === 1 ? "y" : "ies"}`;
   if (mainActivities) summary += ` — ${mainActivities}`;
-  if (totalCost > 0) summary += ` · ~$${totalCost} for you`;
+  if (totalCost > 0) summary += ` · ~$${totalCost}/person`;
   if (flagCount > 0) summary += ` · ${flagCount} flag${flagCount > 1 ? "s" : ""} to check`;
 
   return summary;
@@ -50,27 +48,75 @@ function summarizeDay(day, userId) {
 export default function TripDetail() {
   const { groupId } = useParams();
   const navigate = useNavigate();
-  const { currentUserId } = useCurrentUser();
   const [group, setGroup] = useState(null);
   const [itinerary, setItinerary] = useState([]);
   const [users, setUsers] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [expandedDay, setExpandedDay] = useState(null);
-  const [groupMembers, setGroupMembers] = useState([]);
+
+  const [expenseForm, setExpenseForm] = useState({
+    description: "",
+    totalCost: "",
+    paidByUserId: "",
+    participantIds: [],
+  });
+  const [expenseMessage, setExpenseMessage] = useState("");
 
   useEffect(() => {
     const id = Number(groupId);
     getGroup(id).then(setGroup);
     getItinerary(id).then(setItinerary);
     getUsers().then(setUsers);
-    getGroupMembers(id).then(setGroupMembers);
+    getGroupMembers(id).then((m) => {
+      setMembers(m);
+      // default: paid by the first member, split among everyone
+      setExpenseForm((f) => ({
+        ...f,
+        paidByUserId: f.paidByUserId || (m[0] && m[0].user_id) || "",
+        participantIds: f.participantIds.length ? f.participantIds : m.map((u) => u.user_id),
+      }));
+    });
+    getPayments(id).then(setPayments);
   }, [groupId]);
 
   if (!group) return <p>Loading trip...</p>;
 
+  const toggleParticipant = (userId) => {
+    setExpenseForm((f) => ({
+      ...f,
+      participantIds: f.participantIds.includes(userId)
+        ? f.participantIds.filter((id) => id !== userId)
+        : [...f.participantIds, userId],
+    }));
+  };
+
+  const handleAddExpense = async (e) => {
+    e.preventDefault();
+    const { description, totalCost, paidByUserId, participantIds } = expenseForm;
+
+    if (!description || !totalCost || participantIds.length === 0) {
+      setExpenseMessage("Fill in a description, cost, and at least one participant.");
+      return;
+    }
+
+    const updatedPayments = await addExpense({
+      groupId: Number(groupId),
+      description,
+      totalCost: Number(totalCost),
+      paidByUserId: Number(paidByUserId),
+      participantIds: participantIds.map(Number),
+    });
+
+    setPayments(updatedPayments);
+    setExpenseMessage(`Added "${description}" — split among ${participantIds.length} people.`);
+    setExpenseForm((f) => ({ ...f, description: "", totalCost: "" }));
+  };
+
   const getUserName = (id) => users.find((u) => u.user_id === id)?.name || `User ${id}`;
   const days = groupByDay(itinerary);
   const totalFlags = itinerary.filter((i) => i.flag).length;
-  const totalEstCost = itinerary.filter(i => i.split_among_user_ids.includes(currentUserId)).reduce((sum, i) => sum + (i.est_cost_per_person || 0), 0);
+  const totalEstCost = itinerary.reduce((sum, i) => sum + (i.est_cost_per_person || 0), 0);
 
   return (
     <div>
@@ -79,8 +125,6 @@ export default function TripDetail() {
       </button>
 
       <h2 style={{ ...sectionTitle, marginTop: "8px" }}>{group.trip_name}</h2>
-      <PlannerPanel key={`${groupId}-${currentUserId}`} groupId={Number(groupId)} userId={currentUserId}
-        onSaved={() => getItinerary(Number(groupId)).then(setItinerary)} />
 
       {/* --- Summary --- */}
       <div style={{ ...card, ...styles.summaryCard }}>
@@ -100,50 +144,13 @@ export default function TripDetail() {
             <div style={styles.summaryValue}>{group.invite_code}</div>
           </div>
           <div>
-            <div style={styles.summaryLabel}>Your activity estimate</div>
+            <div style={styles.summaryLabel}>Est. total per person</div>
             <div style={styles.summaryValue}>${totalEstCost}</div>
           </div>
         </div>
         {totalFlags > 0 && (
           <div style={styles.flagBanner}>
             &#9888; {totalFlags} potential conflict{totalFlags > 1 ? "s" : ""} flagged below
-          </div>
-        )}
-      </div>
-
-      <h3
-        style={{
-          ...sectionTitle,
-          fontSize: "17px",
-          marginTop: "24px",
-        }}
-      >
-        Trip Members
-      </h3>
-
-      <div style={card}>
-        {groupMembers.length === 0 ? (
-          <p>No members yet.</p>
-        ) : (
-          <div
-            style={{
-              display: "flex",
-              gap: "8px",
-              flexWrap: "wrap",
-            }}
-          >
-            {groupMembers.map((member) => (
-              <span
-                key={member.user_id}
-                style={{
-                  ...styles.metaChip,
-                  fontSize: "13px",
-                  padding: "6px 10px",
-                }}
-              >
-                {member.name}
-              </span>
-            ))}
           </div>
         )}
       </div>
@@ -166,7 +173,7 @@ export default function TripDetail() {
                 <span style={styles.dayTitle}>
                   Day {dayNum} <span style={styles.dayDate}>{day.date}</span>
                 </span>
-                <span style={styles.daySummary}>{summarizeDay(day, currentUserId)}</span>
+                <span style={styles.daySummary}>{summarizeDay(day)}</span>
               </span>
               <span style={styles.dayMeta}>
                 {dayFlags > 0 && <span style={styles.dayFlagBadge}>{dayFlags} flag{dayFlags > 1 ? "s" : ""}</span>}
@@ -199,6 +206,86 @@ export default function TripDetail() {
           </div>
         );
       })}
+
+      {/* --- Add Expense --- */}
+      <h3 style={{ ...sectionTitle, fontSize: "17px", marginTop: "28px" }}>
+        Add an Expense
+      </h3>
+      <form onSubmit={handleAddExpense} style={card}>
+        <label style={label}>What was it for?</label>
+        <input
+          style={input}
+          value={expenseForm.description}
+          onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+          placeholder="e.g. Taxi to the airport"
+        />
+
+        <label style={label}>Total cost</label>
+        <input
+          style={input}
+          type="number"
+          min="0"
+          step="0.01"
+          value={expenseForm.totalCost}
+          onChange={(e) => setExpenseForm({ ...expenseForm, totalCost: e.target.value })}
+          placeholder="0.00"
+        />
+
+        <label style={label}>Who paid?</label>
+        <select
+          style={input}
+          value={expenseForm.paidByUserId}
+          onChange={(e) => setExpenseForm({ ...expenseForm, paidByUserId: e.target.value })}
+        >
+          {members.map((m) => (
+            <option key={m.user_id} value={m.user_id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+
+        <label style={label}>Split among</label>
+        <div style={styles.checkboxRow}>
+          {members.map((m) => (
+            <label key={m.user_id} style={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={expenseForm.participantIds.includes(m.user_id)}
+                onChange={() => toggleParticipant(m.user_id)}
+              />
+              {m.name}
+            </label>
+          ))}
+        </div>
+
+        <button
+          type="submit"
+          style={{ ...button.base, ...button.primary, marginTop: "8px" }}
+        >
+          Add expense &amp; split
+        </button>
+        {expenseMessage && <p style={styles.expenseMessage}>{expenseMessage}</p>}
+      </form>
+
+      {/* --- Trip ledger --- */}
+      <h3 style={{ ...sectionTitle, fontSize: "17px", marginTop: "28px" }}>
+        Trip Ledger
+      </h3>
+      <div style={card}>
+        {payments.length === 0 && <p style={styles.emptyLedger}>No expenses logged yet.</p>}
+        {payments.map((p, idx) => (
+          <div key={idx} style={styles.ledgerLine}>
+            <span>
+              <strong>{getUserName(p.from_user_id)}</strong> owes{" "}
+              <strong>{getUserName(p.to_user_id)}</strong>{" "}
+              <span style={styles.ledgerActivity}>({p.activity_ref})</span>
+            </span>
+            <span style={p.paid ? styles.ledgerPaid : styles.ledgerUnpaid}>
+              ${p.amount_owed} {p.paid ? "· paid" : "· unpaid"}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -259,7 +346,9 @@ const styles = {
     gap: "3px",
   },
   dayTitle: {
+    fontFamily: fonts.heading,
     fontWeight: 700,
+    fontSize: "18px",
     color: colors.ink,
   },
   daySummary: {
@@ -323,5 +412,50 @@ const styles = {
     borderRadius: "6px",
     marginTop: "6px",
     display: "inline-block",
+  },
+  checkboxRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "14px",
+    marginBottom: "14px",
+  },
+  checkboxLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "14px",
+    color: colors.text,
+  },
+  expenseMessage: {
+    marginTop: "10px",
+    fontSize: "13px",
+    color: colors.good,
+  },
+  emptyLedger: {
+    color: colors.textMuted,
+    fontSize: "14px",
+    margin: 0,
+  },
+  ledgerLine: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "8px 0",
+    borderBottom: `1px solid ${colors.border}`,
+    fontSize: "14px",
+  },
+  ledgerActivity: {
+    color: colors.textMuted,
+    fontSize: "12px",
+  },
+  ledgerPaid: {
+    color: colors.good,
+    fontWeight: 600,
+    fontSize: "13px",
+  },
+  ledgerUnpaid: {
+    color: colors.bad,
+    fontWeight: 600,
+    fontSize: "13px",
   },
 };

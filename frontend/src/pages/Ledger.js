@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { getUserLedger, getUsers } from "../dataService";
+import { getUserLedger, getUsers, settleUp } from "../dataService";
 import { useCurrentUser } from "../UserContext";
-import { colors, card, sectionTitle } from "../styles";
+import { colors, card, sectionTitle, button } from "../styles";
 
 export default function Ledger() {
   const { currentUserId } = useCurrentUser();
@@ -9,15 +9,25 @@ export default function Ledger() {
   const [owedByOthers, setOwedByOthers] = useState({});
   const [users, setUsers] = useState([]);
 
-  useEffect(() => {
+  const loadLedger = () => {
     getUserLedger(currentUserId).then(({ owesOthers, owedByOthers }) => {
       setOwesOthers(owesOthers);
       setOwedByOthers(owedByOthers);
     });
+  };
+
+  useEffect(() => {
+    loadLedger();
     getUsers().then(setUsers);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
 
   const getUserName = (id) => users.find((u) => u.user_id === id)?.name || `User ${id}`;
+
+  const handleSettleUp = async (toId) => {
+    await settleUp(currentUserId, toId);
+    loadLedger();
+  };
 
   const owesEntries = Object.entries(owesOthers);
   const owedEntries = Object.entries(owedByOthers);
@@ -52,8 +62,16 @@ export default function Ledger() {
             <span>
               You owe <strong>{getUserName(Number(toId))}</strong>
             </span>
-            <span style={{ color: colors.bad, fontWeight: 700 }}>
-              ${amount.toFixed(2)}
+            <span style={styles.lineRight}>
+              <span style={{ color: colors.bad, fontWeight: 700 }}>
+                ${amount.toFixed(2)}
+              </span>
+              <button
+                style={{ ...button.base, ...button.secondary, ...styles.settleButton }}
+                onClick={() => handleSettleUp(Number(toId))}
+              >
+                Settle up
+              </button>
             </span>
           </div>
         ))}
@@ -99,9 +117,19 @@ const styles = {
   line: {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
     padding: "8px 0",
     borderBottom: `1px solid ${colors.border}`,
     fontSize: "14px",
+  },
+  lineRight: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  settleButton: {
+    padding: "4px 12px",
+    fontSize: "12px",
   },
   emptyText: {
     color: colors.textMuted,

@@ -255,6 +255,36 @@ export async function getPayments(groupId) {
   return db.payments.filter((p) => p.group_id === groupId);
 }
 
+// Splits a cost among participants and appends the resulting ledger
+// entries to the payments table. This is the JS port of the
+// `calculate_split()` function in person_c_cost_split_lambda.py --
+// same logic, so behaviour is consistent whether it runs here (in
+// the browser, against mock/local data) or later in the real Lambda
+// (against real DynamoDB data).
+export async function addExpense({ groupId, description, totalCost, paidByUserId, participantIds }) {
+  if (!participantIds || participantIds.length === 0) {
+    throw new Error("At least one participant is required to split an expense.");
+  }
+
+  const share = Math.round((totalCost / participantIds.length) * 100) / 100;
+
+  const newEntries = participantIds
+    .filter((uid) => uid !== paidByUserId)
+    .map((uid) => ({
+      group_id: groupId,
+      activity_ref: description,
+      from_user_id: uid,
+      to_user_id: paidByUserId,
+      amount_owed: share,
+      paid: false,
+    }));
+
+  db.payments = [...db.payments, ...newEntries];
+  saveDatabase();
+
+  return getPayments(groupId);
+}
+
 export async function togglePaymentStatus(groupId, activityRef, fromUserId, toUserId) {
   db.payments = db.payments.map((p) =>
     p.group_id === groupId &&
@@ -266,6 +296,23 @@ export async function togglePaymentStatus(groupId, activityRef, fromUserId, toUs
   );
   saveDatabase();
   return getPayments(groupId);
+}
+
+// Marks ALL of one user's unpaid debts to another user as paid, across
+// every trip/activity at once. Used by the "Settle Up" button on the
+// Ledger page, where the person sees an aggregated total (e.g. "You
+// owe Priya $32" combining several activities) rather than individual
+// line items -- this settles that whole aggregated amount in one go,
+// instead of requiring them to toggle each underlying activity
+// separately via togglePaymentStatus.
+export async function settleUp(fromUserId, toUserId) {
+  db.payments = db.payments.map((p) =>
+    p.from_user_id === fromUserId && p.to_user_id === toUserId && !p.paid
+      ? { ...p, paid: true }
+      : p
+  );
+  saveDatabase();
+  return getUserLedger(fromUserId);
 }
 
 // Returns unpaid totals across ALL of a user's trips, grouped by

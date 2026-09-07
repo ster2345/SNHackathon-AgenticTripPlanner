@@ -441,7 +441,7 @@ export const mockData = {
       "from_user_id": 1,
       "to_user_id": 2,
       "amount_owed": 8,
-      "paid": "No"
+      "paid": false
     },
     {
       "group_id": 1,
@@ -449,7 +449,7 @@ export const mockData = {
       "from_user_id": 3,
       "to_user_id": 2,
       "amount_owed": 8,
-      "paid": "No"
+      "paid": false
     },
     {
       "group_id": 1,
@@ -457,7 +457,7 @@ export const mockData = {
       "from_user_id": 3,
       "to_user_id": 1,
       "amount_owed": 6,
-      "paid": "No"
+      "paid": false
     },
     {
       "group_id": 1,
@@ -465,7 +465,7 @@ export const mockData = {
       "from_user_id": 4,
       "to_user_id": 1,
       "amount_owed": 6,
-      "paid": "Yes"
+      "paid": true
     },
     {
       "group_id": 1,
